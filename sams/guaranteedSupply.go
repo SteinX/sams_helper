@@ -1,8 +1,9 @@
 package sams
 
 import (
-	"github.com/tidwall/gjson"
 	"strconv"
+
+	"github.com/tidwall/gjson"
 )
 
 func parseNormalGoodsV2(result gjson.Result) (error, NormalGoodsV2) {

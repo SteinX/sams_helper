@@ -204,6 +204,12 @@ ModeEnter:
 			}
 		}
 	} else if session.Setting.RunMode == 2 {
+		fmt.Printf("########## 当前保供商品过滤配置如下 ###########\n")
+		fmt.Printf("########## 需要符合关键字 %v 其中的 %d 个 ###########\n",
+			session.Setting.GSGoodsOption.DescKeywords,
+			session.Setting.GSGoodsOption.DescFullfillCnt)
+		fmt.Printf("########## 并且不能出现这些关键字: %v ###########\n",
+			session.Setting.GSGoodsOption.DescBlackList)
 	GetGoodsLoop:
 		fmt.Printf("########## 获取保供商品【%s】 ###########\n", time.Now().Format("15:04:05"))
 		validGoods := sams.NormalGoodsV2{}
@@ -221,21 +227,42 @@ ModeEnter:
 		}
 
 		for index, v := range goodsList {
-			if session.Setting.SupplyExcludeSet.IsEnabled {
-				isBlack := false
-				for _, keyWord := range session.Setting.SupplyExcludeSet.KeyWords {
-					if len(keyWord) > 0 && strings.Contains(v.Title, keyWord) {
-						fmt.Printf("[已忽略此商品] %s 数量：%v 单价：%d.%d 详情：%s\n", v.Title, v.StockQuantity, v.Price/100, v.Price%100, v.SubTitle)
-						isBlack = true
-						break
-					}
+			fmt.Printf("[%v] %s 数量：%v 单价：%d.%d 详情：%s\n", index, v.Title, v.StockQuantity, v.Price/100, v.Price%100, v.SubTitle)
+			// 先检查黑名单
+			hitBlackList := false
+			descBlackList := session.Setting.GSGoodsOption.DescBlackList
+			for i := 0; i < len(descBlackList); i++ {
+				if strings.Contains(v.SubTitle, descBlackList[i]) {
+					hitBlackList = true
+					fmt.Printf("[%v] %s 详情：%s 命中黑名单关键字: %s\n", index, v.Title, v.SubTitle, descBlackList[i])
+					break
 				}
-				if isBlack {
-					continue
+			}
+			if hitBlackList {
+				continue
+			}
+
+			// 检查是否满足关键字规则
+			descKws := session.Setting.GSGoodsOption.DescKeywords
+			targetDescKwsFullfillCount := session.Setting.GSGoodsOption.DescFullfillCnt
+			var fullfillmentCount int16 = 0
+			isFullfilled := len(descKws) == 0 || targetDescKwsFullfillCount == 0
+
+			for i := 0; i < len(descKws); i++ {
+				if strings.Contains(v.SubTitle, descKws[i]) {
+					fullfillmentCount++
+				}
+				if fullfillmentCount >= targetDescKwsFullfillCount {
+					isFullfilled = true
+					break
 				}
 			}
 
-			fmt.Printf("[%v] %s 数量：%v 单价：%d.%d 详情：%s\n", index, v.Title, v.StockQuantity, v.Price/100, v.Price%100, v.SubTitle)
+			if !isFullfilled {
+				fmt.Printf("[%v] %s 详情：%s 无法满足当前关键字设置\n", index, v.Title, v.SubTitle)
+				continue
+			}
+
 			if v.StockQuantity > 0 {
 				validGoods = v
 				break
